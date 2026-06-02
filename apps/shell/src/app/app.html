@@ -1,0 +1,26 @@
+<ul class="remote-menu">
+  <li><a routerLink="/">Home</a></li>
+  <li><a routerLink="flights">Flights</a></li>
+  <li><a routerLink="cart">Cart</a></li>
+  <li><a routerLink="employees">Employees</a></li>
+</ul>
+
+<tim-button label="Click me"></tim-button>
+
+<lib-tim-modals></lib-tim-modals>
+
+<div class="container">
+  <div class="flex">
+    <div class="w-1/2"></div>
+    <div class="w-1/2">
+      @if (employeeList()) {
+        <ng-container *ngComponentOutlet="employeeList()"></ng-container>
+      } @else {
+        <p>Cannot Employee list component</p>
+      }
+    </div>
+  </div>
+  
+</div>
+
+<router-outlet></router-outlet>
