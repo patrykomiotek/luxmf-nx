@@ -9,12 +9,14 @@ export type InfoEvent =
   | { type: 'EMPLOYEE_FIRE_ALL' };
 
 // === ĆWICZENIE 8: Event-bus (komunikacja przez zdarzenia) ===
-// Zaimplementuj komunikację między MF:
-//  1. emisja zdarzenia do strumienia (infoEvents$.next)
-//  2. rozgłoszenie na window przez CustomEvent('info-event', { detail })
-//  3. nasłuch window 'info-event' w konstruktorze i ponowna emisja do strumienia
-//  4. publiczny strumień events$ dla subskrybentów (panel detali w shellu)
-// Rozwiązanie wzorcowe: info-mf-nx/libs/event-bus/src/event-bus.service.ts
+// Komunikacja między mikrofrontendami:
+//  - każdy MF może mieć własną instancję serwisu, więc sam Subject NIE przekracza
+//    granicy MF -> rozgłaszamy zdarzenia na `window` przez CustomEvent('info-event').
+//  - jeden, wspólny kanał: metody akcji rozgłaszają na window, a listener window
+//    karmi lokalny strumień (emitInfoEvent). Dzięki temu KAŻDA instancja emituje
+//    dane zdarzenie dokładnie raz (brak podwójnej emisji u nadawcy).
+const INFO_EVENT = 'info-event';
+
 @Injectable({
   providedIn: 'root',
 })
@@ -25,26 +27,37 @@ export class EventBusService {
   events$: Observable<InfoEvent> = this.infoEvents$.asObservable();
 
   constructor() {
-    // TODO (Ćw. 8): window.addEventListener('info-event', (e: any) => this.emitInfoEvent(e.detail));
+    // 3. Nasłuch zdarzeń z window i ponowna emisja do lokalnego strumienia.
+    window.addEventListener(INFO_EVENT, (e: Event) => {
+      this.emitInfoEvent((e as CustomEvent<InfoEvent>).detail);
+    });
   }
 
-  emitInfoEvent(_infoEvent: InfoEvent): void {
-    // TODO (Ćw. 8): this.infoEvents$.next(_infoEvent);
+  // 1. Emisja zdarzenia do lokalnego strumienia RxJS.
+  emitInfoEvent(infoEvent: InfoEvent): void {
+    this.infoEvents$.next(infoEvent);
   }
 
-  selectEmployeeEvent(_id: number): void {
-    // TODO (Ćw. 8): zbuduj zdarzenie EMPLOYEE_SELECTED, emitInfoEvent(...) + broadCastInfoEvents(...)
+  selectEmployeeEvent(id: number): void {
+    this.broadCastInfoEvents({
+      type: 'EMPLOYEE_SELECTED',
+      payload: { employeeId: id },
+    });
   }
 
-  removeEmployeeEvent(_id: number): void {
-    // TODO (Ćw. 8): analogicznie EMPLOYEE_REMOVED
+  removeEmployeeEvent(id: number): void {
+    this.broadCastInfoEvents({
+      type: 'EMPLOYEE_REMOVED',
+      payload: { employeeId: id },
+    });
   }
 
   fireAllEmployeesEvent(): void {
-    // TODO (Ćw. 8): analogicznie EMPLOYEE_FIRE_ALL
+    this.broadCastInfoEvents({ type: 'EMPLOYEE_FIRE_ALL' });
   }
 
-  broadCastInfoEvents(_infoEvent: InfoEvent): void {
-    // TODO (Ćw. 8): window.dispatchEvent(new CustomEvent('info-event', { detail: _infoEvent }));
+  // 2. Rozgłoszenie zdarzenia na window (kanał między-MF).
+  broadCastInfoEvents(infoEvent: InfoEvent): void {
+    window.dispatchEvent(new CustomEvent(INFO_EVENT, { detail: infoEvent }));
   }
 }
