@@ -6,17 +6,24 @@ import { Observable, Subject } from 'rxjs';
 export type InfoEvent =
   | { type: 'EMPLOYEE_SELECTED'; payload: { employeeId: number } }
   | { type: 'EMPLOYEE_REMOVED'; payload: { employeeId: number } }
-  | { type: 'EMPLOYEE_FIRE_ALL' };
+  | { type: 'EMPLOYEE_FIRE_ALL' }
+  // === ĆWICZENIE 16: nawigacja przez zdarzenie (zamiast twardego RouterLink) ===
+  // Remote, który wystawia komponent z linkami, NIE powinien znać struktury tras hosta
+  // (dziś flight-list.html ma na sztywno `[routerLink]="['/flights', id]"` -> sprzężenie z hostem).
+  // Zamiast tego remote PROSI o nawigację zdarzeniem, a host (właściciel routingu) ją wykonuje:
+  | { type: 'ROUTE_CHANGE_REQUESTED'; payload: { commands: unknown[] } }
+  // === ĆWICZENIE 17: sesja / stan logowania (propagacja przez zdarzenia) ===
+  | { type: 'USER_LOGGED_IN'; payload: { username: string } }
+  | { type: 'USER_LOGGED_OUT' }
+  | { type: 'SESSION_EXPIRED' };
 
 // === ĆWICZENIE 8: Event-bus (komunikacja przez zdarzenia) ===
-// Komunikacja między mikrofrontendami:
-//  - każdy MF może mieć własną instancję serwisu, więc sam Subject NIE przekracza
-//    granicy MF -> rozgłaszamy zdarzenia na `window` przez CustomEvent('info-event').
-//  - jeden, wspólny kanał: metody akcji rozgłaszają na window, a listener window
-//    karmi lokalny strumień (emitInfoEvent). Dzięki temu KAŻDA instancja emituje
-//    dane zdarzenie dokładnie raz (brak podwójnej emisji u nadawcy).
-const INFO_EVENT = 'info-event';
-
+// Zaimplementuj komunikację między MF:
+//  1. emisja zdarzenia do strumienia (infoEvents$.next)
+//  2. rozgłoszenie na window przez CustomEvent('info-event', { detail })
+//  3. nasłuch window 'info-event' w konstruktorze i ponowna emisja do strumienia
+//  4. publiczny strumień events$ dla subskrybentów (panel detali w shellu)
+// Rozwiązanie wzorcowe: info-mf-nx/libs/event-bus/src/event-bus.service.ts
 @Injectable({
   providedIn: 'root',
 })
@@ -27,37 +34,72 @@ export class EventBusService {
   events$: Observable<InfoEvent> = this.infoEvents$.asObservable();
 
   constructor() {
-    // 3. Nasłuch zdarzeń z window i ponowna emisja do lokalnego strumienia.
-    window.addEventListener(INFO_EVENT, (e: Event) => {
-      this.emitInfoEvent((e as CustomEvent<InfoEvent>).detail);
-    });
+    // Nasłuch zdarzeń przychodzących z innych MF (rozgłoszonych po window) i ponowna
+    // emisja do lokalnego strumienia, żeby subskrybenci w TYM MF też je dostali.
+    window.addEventListener('info-event', (e: Event) =>
+      this.emitInfoEvent((e as CustomEvent<InfoEvent>).detail)
+    );
   }
 
-  // 1. Emisja zdarzenia do lokalnego strumienia RxJS.
   emitInfoEvent(infoEvent: InfoEvent): void {
     this.infoEvents$.next(infoEvent);
   }
 
   selectEmployeeEvent(id: number): void {
-    this.broadCastInfoEvents({
+    const event: InfoEvent = {
       type: 'EMPLOYEE_SELECTED',
       payload: { employeeId: id },
-    });
+    };
+    this.emitInfoEvent(event);
+    this.broadCastInfoEvents(event);
   }
 
   removeEmployeeEvent(id: number): void {
-    this.broadCastInfoEvents({
+    const event: InfoEvent = {
       type: 'EMPLOYEE_REMOVED',
       payload: { employeeId: id },
-    });
+    };
+    this.emitInfoEvent(event);
+    this.broadCastInfoEvents(event);
   }
 
   fireAllEmployeesEvent(): void {
-    this.broadCastInfoEvents({ type: 'EMPLOYEE_FIRE_ALL' });
+    const event: InfoEvent = { type: 'EMPLOYEE_FIRE_ALL' };
+    this.emitInfoEvent(event);
+    this.broadCastInfoEvents(event);
   }
 
-  // 2. Rozgłoszenie zdarzenia na window (kanał między-MF).
   broadCastInfoEvents(infoEvent: InfoEvent): void {
-    window.dispatchEvent(new CustomEvent(INFO_EVENT, { detail: infoEvent }));
+    window.dispatchEvent(new CustomEvent('info-event', { detail: infoEvent }));
+  }
+
+  // === ĆWICZENIE 16: remote prosi o nawigację, host ją wykonuje ===
+  // Remote woła to zamiast routować bezpośrednio. Host subskrybuje events$ i robi router.navigate.
+  requestRouteChange(commands: unknown[]): void {
+    const event: InfoEvent = {
+      type: 'ROUTE_CHANGE_REQUESTED',
+      payload: { commands },
+    };
+    this.emitInfoEvent(event); // lokalny strumień (ten sam MF)
+    this.broadCastInfoEvents(event); // przez window do hosta / innych MF
+  }
+
+  // === ĆWICZENIE 17: zdarzenia sesji ===
+  userLoggedIn(username: string): void {
+    const event: InfoEvent = { type: 'USER_LOGGED_IN', payload: { username } };
+    this.emitInfoEvent(event);
+    this.broadCastInfoEvents(event);
+  }
+
+  userLoggedOut(): void {
+    const event: InfoEvent = { type: 'USER_LOGGED_OUT' };
+    this.emitInfoEvent(event);
+    this.broadCastInfoEvents(event);
+  }
+
+  sessionExpired(): void {
+    const event: InfoEvent = { type: 'SESSION_EXPIRED' };
+    this.emitInfoEvent(event);
+    this.broadCastInfoEvents(event);
   }
 }

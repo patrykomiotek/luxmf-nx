@@ -1,24 +1,18 @@
 import { Component, inject, signal, Type } from '@angular/core';
+import { RouterModule, Router } from '@angular/router';
+import { NgComponentOutlet } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { RouterModule } from '@angular/router';
-import { CommonModule, NgComponentOutlet } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
+import { filter } from 'rxjs';
+import { loadRemoteModule } from '@nx/angular/mf';
 import { ButtonComponent } from '@info-mf-nx/tim-ui';
-import { EventBusService, InfoEvent } from '@info-mf-nx/event-bus';
-import { EmployeeDto } from '@info-mf-nx/contracts';
+import { EventBusService } from '@info-mf-nx/event-bus';
 import { TimModals } from '@tim-modals';
-import { loadRemoteWithFallback } from './shared/load-remote-with-fallback';
 
-const API_BASE_URL = 'http://localhost:3002/api';
+import { loadRemoteWithFallback } from './shared/load-remote-with-fallback';
+import { SessionService } from './auth/session.service';
 
 @Component({
-  imports: [
-    CommonModule,
-    RouterModule,
-    ButtonComponent,
-    TimModals,
-    NgComponentOutlet,
-  ],
+  imports: [RouterModule, ButtonComponent, TimModals, NgComponentOutlet],
   selector: 'info-mf-nx-root',
   templateUrl: './app.html',
   styleUrl: './app.css',
@@ -26,82 +20,83 @@ const API_BASE_URL = 'http://localhost:3002/api';
 export class App {
   protected title = 'shell';
 
+  private router = inject(Router);
+  private bus = inject(EventBusService);
+  private session = inject(SessionService);
+
+  // === ĆWICZENIE 17: stan sesji w navbarze ===
+  // Sygnał z SessionService – navbar reaguje reaktywnie na login/logout/wygaśnięcie.
+  readonly user = this.session.user;
+  // Komunikat dla użytkownika po automatycznym wylogowaniu (TTL).
+  readonly sessionMessage = signal<string | null>(null);
+
   // Sygnał trzyma KLASĘ komponentu załadowaną z remota (osadzaną przez *ngComponentOutlet w app.html).
   employeeList = signal<Type<unknown> | null>(null);
 
-  // === ĆWICZENIE 8 (panel detali) – shell SUBSKRYBUJE zdarzenia z EventBus ===
-  // Shell nie wie nic o remocie employees poza wspólnym kontraktem zdarzeń.
-  private eventBus = inject(EventBusService);
-  private http = inject(HttpClient);
+  constructor() {
+    // === ĆWICZENIE 6 + 14: Remote jako komponent (NgComponentOutlet) z izolacją awarii ===
+    this.loadEmployeeList();
 
-  selectedEmployee = signal<EmployeeDto | null>(null);
-  lastEvent = signal<string>('—');
+    // === ĆWICZENIE 16: host wykonuje nawigację na prośbę remota (ROUTE_CHANGE_REQUESTED) ===
+    // Remote nie zna struktury tras hosta – wysyła tylko intencję, host nawiguje.
+    this.bus.events$
+      .pipe(
+        filter((e) => e.type === 'ROUTE_CHANGE_REQUESTED'),
+        takeUntilDestroyed()
+      )
+      .subscribe((e) =>
+        this.router.navigate(
+          (e as Extract<typeof e, { type: 'ROUTE_CHANGE_REQUESTED' }>).payload
+            .commands as unknown[]
+        )
+      );
 
-  private async loadEmployeeList() {
+    // === ĆWICZENIE 17: reakcja hosta na wygaśnięcie sesji ===
+    // SessionService po upływie TTL woła bus.sessionExpired() (emit + broadcast). Host pokazuje
+    // komunikat i wraca na stronę główną. Dzięki event-busowi tak samo zareagowałby każdy MF.
+    this.bus.events$
+      .pipe(
+        filter((e) => e.type === 'SESSION_EXPIRED'),
+        takeUntilDestroyed()
+      )
+      .subscribe(() => {
+        this.sessionMessage.set('Sesja wygasła – zaloguj się ponownie.');
+        this.router.navigate(['/']);
+      });
+  }
+
+  // === ĆWICZENIE 17: akcje logowania wywoływane z navbara ===
+  signIn(username: string): void {
+    const name = username.trim();
+    if (!name) {
+      return;
+    }
+    this.sessionMessage.set(null);
+    this.session.login(name);
+  }
+
+  signOut(): void {
+    this.session.logout();
+    this.sessionMessage.set(null);
+  }
+
+  // === ĆWICZENIE 6 + 14 ===
+  // Ładuje komponent z remota i ustawia sygnał. Próbuje źródeł po kolei (primary -> backup),
+  // a gdy WSZYSTKIE padną – pokazuje fallback UI zamiast crashować całego shella.
+  private async loadEmployeeList(): Promise<void> {
     try {
-      const componentWithFallback = await loadRemoteWithFallback<{
+      const m = await loadRemoteWithFallback<{
         EmployeesListComponent: Type<unknown>;
       }>([
-        // () => loadRemoteModule('employees', 'EmployeesList'),
-        () => import('employees/EmployeesList'),
+        () => loadRemoteModule('employees', './EmployeesList'), // primary (z manifestu, Ćw. 15)
+        // Tu można dołożyć kolejne loadery z backupowych źródeł (federation-manifest.backup.json).
       ]);
-      this.employeeList.set(componentWithFallback.EmployeesListComponent);
+      this.employeeList.set(m.EmployeesListComponent);
     } catch {
       const { EmployeesUnavailableComponent } = await import(
         './shared/employees-unavailable.component'
       );
-      this.employeeList.set(EmployeesUnavailableComponent);
+      this.employeeList.set(EmployeesUnavailableComponent); // fallback UI – shell NIE pada
     }
   }
-
-  constructor() {
-    // === ĆWICZENIE 6: Remote jako komponent (NgComponentOutlet) ===
-    // TODO: odkomentuj aby zobaczyć całą stronę
-    this.loadEmployeeList();
-
-    this.eventBus.events$
-      .pipe(takeUntilDestroyed())
-      .subscribe((event) => this.handleEvent(event));
-  }
-
-  private handleEvent(event: InfoEvent): void {
-    this.lastEvent.set(this.describe(event));
-
-    switch (event.type) {
-      case 'EMPLOYEE_SELECTED':
-        // Reakcja na zdarzenie z remota: dociągamy detale z BFF i pokazujemy w panelu.
-        this.http
-          .get<EmployeeDto>(
-            `${API_BASE_URL}/employees/${event.payload.employeeId}`
-          )
-          .subscribe((employee) => this.selectedEmployee.set(employee));
-        break;
-      case 'EMPLOYEE_REMOVED':
-        if (this.selectedEmployee()?.id === event.payload.employeeId) {
-          this.selectedEmployee.set(null);
-        }
-        break;
-      case 'EMPLOYEE_FIRE_ALL':
-        this.selectedEmployee.set(null);
-        break;
-    }
-  }
-
-  private describe(event: InfoEvent): string {
-    switch (event.type) {
-      case 'EMPLOYEE_SELECTED':
-        return `Wybrano pracownika #${event.payload.employeeId}`;
-      case 'EMPLOYEE_REMOVED':
-        return `Zwolniono pracownika #${event.payload.employeeId}`;
-      case 'EMPLOYEE_FIRE_ALL':
-        return 'Zwolniono wszystkich pracowników';
-    }
-  }
-
-  // === ĆWICZENIE 6 ===
-  // Załaduj komponent z remota i ustaw sygnał. Owiń w try/catch (izolacja awarii):
-  //   const m = await import('employees/EmployeesList');
-  //   this.employeeList.set(m.EmployeesListComponent);
-  // Rozwiązanie wzorcowe: info-mf-nx/apps/shell/src/app/app.ts
-  // private async loadEmployeeList() { ... }
 }
