@@ -8,10 +8,29 @@ import { setRemoteDefinitions } from '@nx/angular/mf';
 //   Step 2: wybór pliku manifestu wg środowiska:
 //           /federation-manifest.{local|staging|production}.json
 //   Step 3: walidacja manifestu przez Zod, a następnie:
-const manifestFile = '/federation-manifest.json';
+
+function pickEnv() {
+  const fromBuild = (globalThis as Record<string, unknown>)[
+    'NX_PUBLIC_TARGET_ENV'
+  ];
+
+  console.log('fromBuild', fromBuild);
+  console.log('globalThis', globalThis);
+
+  return fromBuild;
+}
+
+const TARGET_ENV = pickEnv() || 'local';
+const manifestFile = `/federation-manifest.${TARGET_ENV}.json`;
+
+// const manifestSchema = schema.asyncParse(manifestFile); // safe
+// try
+
 fetch(manifestFile)
   .then((res) => res.json())
   .then((defs) => setRemoteDefinitions(defs))
-  .then(() => import('./bootstrap'));
+  .then(() => import('./bootstrap'))
+  .catch((err) => console.error(err));
 // Rozwiązanie wzorcowe: info-mf-nx/apps/shell/src/main.ts
+
 // import('./bootstrap').catch((err) => console.error(err));

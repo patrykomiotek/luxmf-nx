@@ -7,6 +7,7 @@ import { ButtonComponent } from '@info-mf-nx/tim-ui';
 import { EventBusService, InfoEvent } from '@info-mf-nx/event-bus';
 import { EmployeeDto } from '@info-mf-nx/contracts';
 import { TimModals } from '@tim-modals';
+import { loadRemoteWithFallback } from './shared/load-remote-with-fallback';
 
 const API_BASE_URL = 'http://localhost:3002/api';
 
@@ -36,9 +37,24 @@ export class App {
   selectedEmployee = signal<EmployeeDto | null>(null);
   lastEvent = signal<string>('—');
 
+  private async loadEmployeeList() {
+    try {
+      const m = await loadRemoteWithFallback<{
+        EmployeesListComponent: Type<unknown>;
+      }>([() => import('employees/EmployeesList')]);
+      this.employeeList.set(m.EmployeesListComponent);
+    } catch {
+      const { EmployeesUnavailableComponent } = await import(
+        './shared/employees-unavailable.component'
+      );
+      this.employeeList.set(EmployeesUnavailableComponent);
+    }
+  }
+
   constructor() {
     // === ĆWICZENIE 6: Remote jako komponent (NgComponentOutlet) ===
-    // this.loadEmployeeList();
+    // TODO: odkomentuj aby zobaczyć całą stronę
+    this.loadEmployeeList();
 
     this.eventBus.events$
       .pipe(takeUntilDestroyed())
@@ -52,7 +68,9 @@ export class App {
       case 'EMPLOYEE_SELECTED':
         // Reakcja na zdarzenie z remota: dociągamy detale z BFF i pokazujemy w panelu.
         this.http
-          .get<EmployeeDto>(`${API_BASE_URL}/employees/${event.payload.employeeId}`)
+          .get<EmployeeDto>(
+            `${API_BASE_URL}/employees/${event.payload.employeeId}`
+          )
           .subscribe((employee) => this.selectedEmployee.set(employee));
         break;
       case 'EMPLOYEE_REMOVED':

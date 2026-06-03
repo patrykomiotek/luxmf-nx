@@ -1,0 +1,6 @@
+{
+  "flights": "https://flights-mf-staging.up.railway.app",
+  "cart": "https://cart-mf-staging.up.railway.app",
+  "employees": "https://employees-mf-staging.up.railway.app",
+  "products": "https://products-mf-staging.up.railway.app"
+}
