@@ -31,7 +31,7 @@ export type RemoteLoader<T> = () => Promise<T>;
  */
 export async function loadRemoteWithFallback<T>(
   loaders: RemoteLoader<T>[],
-  onError?: (error: unknown, attempt: number) => void,
+  onError?: (error: unknown, attempt: number) => void
 ): Promise<T> {
   let lastError: unknown;
 
@@ -41,7 +41,10 @@ export async function loadRemoteWithFallback<T>(
     } catch (error) {
       lastError = error;
       onError?.(error, i);
-      console.warn(`[MF] źródło #${i + 1} niedostępne, próbuję backupu...`, error);
+      console.warn(
+        `[MF] źródło #${i + 1} niedostępne, próbuję backupu...`,
+        error
+      );
     }
   }
 

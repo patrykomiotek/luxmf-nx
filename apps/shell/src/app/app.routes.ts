@@ -18,7 +18,7 @@ export const appRoutes: Route[] = [
     path: 'flights',
     loadChildren: () =>
       loadRemoteModule('flights', './Routes')
-        .then((m) => m.routes)
+        .then((m) => m.remoteRoutes)
         .catch((error) => console.log('To jest error z route')),
 
     // loadChildren: () =>
@@ -29,7 +29,10 @@ export const appRoutes: Route[] = [
   {
     path: 'employees',
     loadChildren: () =>
-      loadRemoteModule('employees', './Routes').then((m) => m.remoteRoutes),
+      // loadRemoteModule('employees', './Routes').then((m) => m.remoteRoutes),
+      loadRemoteModule('employees', './Routes')
+        .then((m) => m.remoteRoutes)
+        .catch((error) => console.log('To jest error z route employees')),
   },
   {
     path: 'cart',

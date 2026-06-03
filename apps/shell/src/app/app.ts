@@ -39,10 +39,13 @@ export class App {
 
   private async loadEmployeeList() {
     try {
-      const m = await loadRemoteWithFallback<{
+      const componentWithFallback = await loadRemoteWithFallback<{
         EmployeesListComponent: Type<unknown>;
-      }>([() => import('employees/EmployeesList')]);
-      this.employeeList.set(m.EmployeesListComponent);
+      }>([
+        // () => loadRemoteModule('employees', 'EmployeesList'),
+        () => import('employees/EmployeesList'),
+      ]);
+      this.employeeList.set(componentWithFallback.EmployeesListComponent);
     } catch {
       const { EmployeesUnavailableComponent } = await import(
         './shared/employees-unavailable.component'
