@@ -1,5 +1,6 @@
 import { Component, ViewEncapsulation } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { EmployeeDto } from '@info-mf-nx/contracts';
 
 @Component({
   selector: 'app-nx-welcome',

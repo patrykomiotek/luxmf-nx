@@ -20,6 +20,10 @@ export default [
               sourceTag: '*',
               onlyDependOnLibsWithTags: ['*'],
             },
+            {
+              sourceTag: 'scope:products',
+              onlyDependOnLibsWithTags: ['type:lib', 'type:contract'],
+            },
           ],
         },
       ],
