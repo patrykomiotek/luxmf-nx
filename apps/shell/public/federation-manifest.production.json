@@ -1,5 +1,6 @@
 {
   "flights": "https://flights-mf-production.up.railway.app",
   "cart": "https://cart-mf-production.up.railway.app",
-  "employees": "https://employees-mf-production.up.railway.app"
+  "employees": "https://employees-mf-production.up.railway.app",
+  "products": "https://products-mf-production.up.railway.app"
 }

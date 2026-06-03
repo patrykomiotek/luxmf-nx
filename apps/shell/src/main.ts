@@ -3,14 +3,15 @@
 //
 // === ĆWICZENIE 11: Federacja dynamiczna (manifest) ===
 // Zamień ten statyczny bootstrap na ładowanie remotów z manifestu w runtime:
-//   import { setRemoteDefinitions } from '@nx/angular/mf';
+import { setRemoteDefinitions } from '@nx/angular/mf';
 //   Step 1: webpack czyta NX_PUBLIC_TARGET_ENV i przekazuje do frontu
 //   Step 2: wybór pliku manifestu wg środowiska:
 //           /federation-manifest.{local|staging|production}.json
 //   Step 3: walidacja manifestu przez Zod, a następnie:
-//           fetch(manifestFile)
-//             .then((res) => res.json())
-//             .then((defs) => setRemoteDefinitions(defs))
-//             .then(() => import('./bootstrap'));
+const manifestFile = '/federation-manifest.json';
+fetch(manifestFile)
+  .then((res) => res.json())
+  .then((defs) => setRemoteDefinitions(defs))
+  .then(() => import('./bootstrap'));
 // Rozwiązanie wzorcowe: info-mf-nx/apps/shell/src/main.ts
-import('./bootstrap').catch((err) => console.error(err));
+// import('./bootstrap').catch((err) => console.error(err));
