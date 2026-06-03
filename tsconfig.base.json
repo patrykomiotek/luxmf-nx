@@ -26,7 +26,8 @@
       "employees/Routes": [
         "apps/employees/src/app/remote-entry/entry.routes.ts"
       ],
-      "flights/Routes": ["apps/flights/src/app/remote-entry/entry.routes.ts"]
+      "flights/Routes": ["apps/flights/src/app/remote-entry/entry.routes.ts"],
+      "products/Routes": ["apps/products/src/app/remote-entry/entry.routes.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]

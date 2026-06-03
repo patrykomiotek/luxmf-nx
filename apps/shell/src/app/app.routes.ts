@@ -2,6 +2,10 @@ import { NxWelcome } from './nx-welcome';
 import { Route } from '@angular/router';
 
 export const appRoutes: Route[] = [
+  {
+    path: 'products',
+    loadChildren: () => import('products/Routes').then((m) => m!.remoteRoutes),
+  },
   // === ĆWICZENIE 4: Pierwszy remote przez routing ===
   // Lazy-load tras z remotów. Każdy remote wystawia './Routes' (entry.routes.ts),
   // host montuje je przez loadChildren.
